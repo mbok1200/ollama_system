@@ -111,5 +111,5 @@ async def models_endpoint(request: Request, refresh: bool = False):
     cfg = Config()
     models = await asyncio.to_thread(cfg.get_models, refresh)
     if models is None:
-        raise HTTPException(status_code=500, detail="Unable to retrieve models")
+        raise HTTPException(status_code=500, detail=f"Unable to retrieve {models}")
     return {"models": models}
