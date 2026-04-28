@@ -5,6 +5,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from slowapi import Limiter
 from slowapi.middleware import SlowAPIMiddleware
 from slowapi.util import get_remote_address
+import asyncio
 
 from classes.search.main import SearchMain
 from classes.generate.main import GenerateMain
@@ -100,3 +101,15 @@ async def tools_endpoint(request: Request, payload: dict):
         raise HTTPException(status_code=400, detail="Missing 'model', 'messages' or 'tool_calls'")
     tm = ToolsMain()
     return await tm.tools(model, messages, tool_calls)
+
+@app.get("/models")
+@limiter.limit("30/minute")
+async def models_endpoint(request: Request, refresh: bool = False):
+    """Return cached list of Ollama cloud models; use `refresh=true` to bypass cache."""
+    from helpers.config import Config
+
+    cfg = Config()
+    models = await asyncio.to_thread(cfg.get_models, refresh)
+    if models is None:
+        raise HTTPException(status_code=500, detail="Unable to retrieve models")
+    return {"models": models}
