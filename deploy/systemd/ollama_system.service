@@ -7,10 +7,10 @@ After=network.target
 User=bradi
 Group=bradi
 WorkingDirectory=/home/bradi/ollama_system
-Environment="PATH=/home/bradi/ollama_system/.venv/bin"
+Environment="PATH=/home/bradi/ollama_system/.venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 Environment="APP_MODULE=app.main:app"
 Environment="WORKERS=1"
-ExecStart=/home/ollama/ollama_system/deploy/gunicorn_start.sh
+ExecStart=/home/bradi/ollama_system/deploy/gunicorn_start.sh
 Restart=always
 RestartSec=5
 

@@ -1,6 +1,6 @@
 from helpers.config import Config
 from ollama import ChatResponse
-import available_functions
+from classes.tools import available_functions
 class ToolsMain:
     def __init__(self):
         self.config = Config()
