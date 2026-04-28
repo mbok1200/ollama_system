@@ -1,2 +1,6 @@
 ollama
-dotenv
+python-dotenv
+fastapi
+uvicorn[standard]
+gunicorn
+slowapi
