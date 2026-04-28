@@ -5,6 +5,9 @@ import time
 from pathlib import Path
 from dotenv import load_dotenv
 import requests
+import logging
+
+logger = logging.getLogger(__name__)
 
 load_dotenv("../.env")
 
@@ -66,6 +69,17 @@ class Config:
             self.available_models = models
             self._write_cache(models)
             return models
-        except Exception:
-            # fallback: return whatever is currently in memory
-            return self.available_models
+        except Exception as e:
+            logger.exception("Failed to fetch models from %s", url)
+            # try to return whatever is in the cache file (even if expired)
+            try:
+                if self._models_cache_file.exists():
+                    data = json.loads(self._models_cache_file.read_text())
+                    models = data.get("models")
+                    self.available_models = models
+                    return models
+            except Exception:
+                logger.exception("Failed to read models cache file %s", self._models_cache_file)
+
+            # final fallback: return in-memory value or empty list
+            return self.available_models if self.available_models is not None else []
