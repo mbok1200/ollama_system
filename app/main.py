@@ -60,7 +60,7 @@ async def health():
 
 @app.post("/search")
 @limiter.limit("10/minute")
-async def search_endpoint(payload: dict):
+async def search_endpoint(request: Request, payload: dict):
     q = payload.get("query")
     if not q:
         raise HTTPException(status_code=400, detail="Missing 'query' field")
@@ -70,7 +70,7 @@ async def search_endpoint(payload: dict):
 
 @app.post("/generate")
 @limiter.limit("10/minute")
-async def generate_endpoint(payload: dict):
+async def generate_endpoint(request: Request, payload: dict):
     model = payload.get("model")
     prompt = payload.get("prompt")
     if not model or not prompt:
@@ -81,7 +81,7 @@ async def generate_endpoint(payload: dict):
 
 @app.post("/chat")
 @limiter.limit("30/minute")
-async def chat_endpoint(payload: dict):
+async def chat_endpoint(request: Request, payload: dict):
     model = payload.get("model")
     messages = payload.get("messages")
     if not model or not messages:
@@ -92,7 +92,7 @@ async def chat_endpoint(payload: dict):
 
 @app.post("/tools")
 @limiter.limit("10/minute")
-async def tools_endpoint(payload: dict):
+async def tools_endpoint(request: Request, payload: dict):
     model = payload.get("model")
     messages = payload.get("messages")
     tool_calls = payload.get("tool_calls")
