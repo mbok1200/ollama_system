@@ -1,4 +1,6 @@
 from helpers.config import Config
+from fastapi import HTTPException
+from ollama._types import ResponseError
 
 class GenerateMain:
     def __init__(self):
@@ -7,11 +9,23 @@ class GenerateMain:
 
     async def generate(self, model: str|list[str], prompt: str):
         result = []
-        if model is str:
-           generate = await self.ollama_client.generate(model, prompt)
-           return generate
-        elif model is list[str]:
+        if isinstance(model, str):
+            try:
+                generate = await self.ollama_client.generate(f"{model}", prompt)
+                return generate
+            except ResponseError as e:
+                # model may require subscription or be forbidden
+                raise HTTPException(status_code=getattr(e, 'status_code', 403), detail=str(e))
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+        elif isinstance(model, list):
             for m in model:
-                generate = await self.ollama_client.generate(m, prompt)
-                result.append(generate)
+                try:
+                    generate = await self.ollama_client.generate(m, prompt)
+                    result.append(generate)
+                except ResponseError as e:
+                    # propagate as HTTP error with context
+                    raise HTTPException(status_code=getattr(e, 'status_code', 403), detail=str(e))
+                except Exception as e:
+                    raise HTTPException(status_code=500, detail=str(e))
             return result
