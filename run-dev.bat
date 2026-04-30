@@ -45,6 +45,10 @@ if not exist ".env" (
     echo [!] Before running the server, configure your .env file
 )
 
+REM Get port from environment or use default
+if "%PORT%"=="" set PORT=8000
+echo [*] Using port: %PORT%
+
 REM Ask which mode to run
 echo.
 echo [?] How would you like to run the server?
@@ -58,29 +62,29 @@ set /p choice="Enter choice (1-5): "
 
 if "%choice%"=="1" (
     echo [*] Starting development server (foreground)...
-    echo [*] Server will be available at http://localhost:8000 and http://YOUR_IP:8000
+    echo [*] Server will be available at http://localhost:%PORT% and http://YOUR_IP:%PORT%
     echo [*] Press Ctrl+C to stop
     echo.
-    python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    python -m uvicorn app.main:app --host 0.0.0.0 --port %PORT% --reload
 ) else if "%choice%"=="2" (
     echo [*] Starting development server (background)...
-    echo [*] Server will be available at http://localhost:8000 and http://YOUR_IP:8000
+    echo [*] Server will be available at http://localhost:%PORT% and http://YOUR_IP:%PORT%
     echo [*] Check console.log for output
     echo.
-    start "Ollama System - Dev" /MIN python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    start "Ollama System - Dev" /MIN python -m uvicorn app.main:app --host 0.0.0.0 --port %PORT% --reload
     timeout /t 2 /nobreak
     echo [+] Server started in background. Open console.log to see output.
 ) else if "%choice%"=="3" (
     echo [*] Starting production server (foreground)...
-    echo [*] Server will be available at http://localhost:8000 and http://YOUR_IP:8000
+    echo [*] Server will be available at http://localhost:%PORT% and http://YOUR_IP:%PORT%
     echo.
-    python -m gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000 --workers 1
+    python -m gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:%PORT% --workers 1
 ) else if "%choice%"=="4" (
     echo [*] Starting production server (background)...
-    echo [*] Server will be available at http://localhost:8000 and http://YOUR_IP:8000
+    echo [*] Server will be available at http://localhost:%PORT% and http://YOUR_IP:%PORT%
     echo [*] Check console.log for output
     echo.
-    start "Ollama System - Prod" /MIN python -m gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000 --workers 1
+    start "Ollama System - Prod" /MIN python -m gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:%PORT% --workers 1
     timeout /t 2 /nobreak
     echo [+] Server started in background. Open console.log to see output.
 ) else if "%choice%"=="5" (
