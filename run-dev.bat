@@ -49,6 +49,17 @@ REM Get port from environment or use default
 if "%PORT%"=="" set PORT=8000
 echo [*] Using port: %PORT%
 
+REM Kill any existing processes on the port
+echo [*] Checking for existing processes on port %PORT%...
+for /f "tokens=5" %%a in ('netstat -ano ^| findstr ":%PORT% "') do (
+    if not "%%a"=="" (
+        echo [!] Found existing process on port %PORT% (PID: %%a), killing it...
+        taskkill /PID %%a /F >nul 2>&1
+    )
+)
+timeout /t 1 /nobreak >nul
+echo [+] Port %PORT% is now free
+
 REM Ask which mode to run
 echo.
 echo [?] How would you like to run the server?

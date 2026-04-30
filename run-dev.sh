@@ -43,6 +43,26 @@ fi
 PORT=${PORT:-8000}
 echo "[*] Using port: $PORT"
 
+# Kill any existing processes on the port
+echo "[*] Checking for existing processes on port $PORT..."
+if lsof -i :$PORT &>/dev/null 2>&1 || netstat -tuln 2>/dev/null | grep -q ":$PORT "; then
+    echo "[!] Found existing process on port $PORT, killing it..."
+    # Try lsof first (Linux), then fall back to fuser
+    if command -v lsof &>/dev/null; then
+        lsof -ti :$PORT | xargs -r kill -9 2>/dev/null || true
+    elif command -v fuser &>/dev/null; then
+        fuser -k $PORT/tcp 2>/dev/null || true
+    else
+        # Fallback: try to find Python processes
+        pkill -f "uvicorn.*:$PORT" || true
+        pkill -f "gunicorn.*:$PORT" || true
+    fi
+    sleep 1
+    echo "[+] Port $PORT is now free"
+else
+    echo "[+] Port $PORT is free"
+fi
+
 echo
 echo "[?] How would you like to run the server?"
 echo "    1 = Development (uvicorn with auto-reload, foreground)"
