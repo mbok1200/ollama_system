@@ -41,28 +41,50 @@ fi
 
 echo
 echo "[?] How would you like to run the server?"
-echo "    1 = Development (uvicorn with auto-reload)"
-echo "    2 = Production (gunicorn)"
-echo "    3 = Exit"
+echo "    1 = Development (uvicorn with auto-reload, foreground)"
+echo "    2 = Development (uvicorn in background with nohup)"
+echo "    3 = Production (gunicorn, foreground)"
+echo "    4 = Production (gunicorn in background with nohup)"
+echo "    5 = Exit"
 echo
 
-read -p "Enter choice (1-3): " choice
+read -p "Enter choice (1-5): " choice
 
 case "$choice" in
     1)
-        echo "[*] Starting development server..."
-        echo "[*] Server will be available at http://localhost:8000"
+        echo "[*] Starting development server (foreground)..."
+        echo "[*] Server will be available at http://localhost:8000 and http://YOUR_IP:8000"
         echo "[*] Press Ctrl+C to stop"
         echo
-        python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 --reload
+        python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
         ;;
     2)
-        echo "[*] Starting production server..."
-        echo "[*] Server will be available at http://127.0.0.1:8000"
+        echo "[*] Starting development server (background)..."
+        echo "[*] Server will be available at http://localhost:8000 and http://YOUR_IP:8000"
+        echo "[*] Check ollama_system.log for output"
         echo
-        python -m gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 127.0.0.1:8000 --workers 1
+        nohup python -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload > ollama_system.log 2>&1 &
+        echo "[+] Server started in background (PID: $!)"
+        echo "[*] Run 'tail -f ollama_system.log' to see logs"
+        echo "[*] Run 'pkill -f uvicorn' to stop the server"
         ;;
     3)
+        echo "[*] Starting production server (foreground)..."
+        echo "[*] Server will be available at http://localhost:8000 and http://YOUR_IP:8000"
+        echo
+        python -m gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000 --workers 1
+        ;;
+    4)
+        echo "[*] Starting production server (background)..."
+        echo "[*] Server will be available at http://localhost:8000 and http://YOUR_IP:8000"
+        echo "[*] Check ollama_system.log for output"
+        echo
+        nohup python -m gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000 --workers 1 > ollama_system.log 2>&1 &
+        echo "[+] Server started in background (PID: $!)"
+        echo "[*] Run 'tail -f ollama_system.log' to see logs"
+        echo "[*] Run 'pkill -f gunicorn' to stop the server"
+        ;;
+    5)
         echo "[*] Exiting..."
         exit 0
         ;;
