@@ -12,7 +12,10 @@ from classes.search.main import SearchMain
 from classes.generate.main import GenerateMain
 from classes.chat.main import ChatMain
 from classes.tools.main import ToolsMain
+from classes.generate_multi.main import GenerateMultiProviderMain
+from classes.chat_multi.main import ChatMultiProviderMain
 from helpers.config import Config
+from helpers.providers_config import ProvidersConfigManager
 
 MAX_BODY_SIZE = int(os.getenv("MAX_BODY_SIZE", 4 * 1024 * 1024))
 
@@ -154,38 +157,27 @@ async def search_endpoint(request: Request, payload: dict):
 @app.post("/generate")
 @limiter.limit("10/minute")
 async def generate_endpoint(request: Request, payload: dict):
-    models = await asyncio.to_thread(cfg.get_models, refresh=False)
-    model = _pick_model(models)
-    prompt = payload.get("prompt")
-    if not model or not prompt:
-        raise HTTPException(status_code=400, detail="Missing 'model' or 'prompt'")
+    system_prompt = payload.get("system_prompt", "")
+    prompt = payload.get("prompt", "")
     gm = GenerateMain()
-    return await gm.generate(model, prompt)
+    return await gm.generate(system_prompt=system_prompt, prompt=prompt)
 
 
 @app.post("/chat")
 @limiter.limit("30/minute")
 async def chat_endpoint(request: Request, payload: dict):
-    models = await asyncio.to_thread(cfg.get_models, refresh=False)
-    model = _pick_model(models)
     messages = payload.get("messages")
-    if not model or not messages:
-        raise HTTPException(status_code=400, detail="Missing 'model' or 'messages'")
     cm = ChatMain()
-    return await cm.chat(model, messages)
+    return await cm.chat(messages)
 
 
 @app.post("/tools")
 @limiter.limit("10/minute")
 async def tools_endpoint(request: Request, payload: dict):
-    models = await asyncio.to_thread(cfg.get_models, refresh=False)
-    model = _pick_model(models)
     messages = payload.get("messages")
     tool_calls = payload.get("tool_calls")
-    if not model or not messages or not tool_calls:
-        raise HTTPException(status_code=400, detail="Missing 'model', 'messages' or 'tool_calls'")
     tm = ToolsMain()
-    return await tm.tools(model, messages, tool_calls)
+    return await tm.tools(messages, tool_calls)
 
 @app.get("/models")
 @limiter.limit("30/minute")
@@ -195,3 +187,175 @@ async def models_endpoint(request: Request, refresh: bool = False):
     if models is None:
         raise HTTPException(status_code=500, detail=f"Unable to retrieve {models}")
     return models
+
+
+# ===== Multi-Provider OpenAI-Compatible Routes =====
+
+@app.post("/openai/chat/completions")
+@limiter.limit("30/minute")
+async def openai_chat_completions(request: Request, payload: dict):
+    """OpenAI-compatible chat completions endpoint"""
+    messages = payload.get("messages", [])
+    model = payload.get("model")
+
+    if not messages:
+        raise HTTPException(status_code=400, detail="Missing 'messages' field")
+
+    cm = ChatMultiProviderMain()
+    response = await cm.chat(messages=messages, model=model)
+
+    return {
+        "object": "chat.completion",
+        "choices": [
+            {
+                "message": {
+                    "role": "assistant",
+                    "content": response
+                },
+                "finish_reason": "stop",
+                "index": 0
+            }
+        ],
+        "model": model or "unknown",
+        "usage": {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0
+        }
+    }
+
+
+@app.post("/openai/generate")
+@limiter.limit("10/minute")
+async def openai_generate(request: Request, payload: dict):
+    """Generate text using multi-provider system"""
+    prompt = payload.get("prompt", "")
+    system_prompt = payload.get("system_prompt", "")
+    model = payload.get("model")
+
+    if not prompt:
+        raise HTTPException(status_code=400, detail="Missing 'prompt' field")
+
+    gm = GenerateMultiProviderMain()
+    response = await gm.generate(
+        prompt=prompt,
+        system_prompt=system_prompt,
+        model=model
+    )
+
+    return {
+        "object": "text_completion",
+        "choices": [
+            {
+                "text": response,
+                "finish_reason": "stop",
+                "index": 0
+            }
+        ],
+        "model": model or "unknown",
+        "usage": {
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "total_tokens": 0
+        }
+    }
+
+
+@app.post("/openai/chat")
+@limiter.limit("30/minute")
+async def openai_chat(request: Request, payload: dict):
+    """Chat endpoint for multi-provider system"""
+    messages = payload.get("messages", [])
+    model = payload.get("model")
+
+    if not messages:
+        raise HTTPException(status_code=400, detail="Missing 'messages' field")
+
+    cm = ChatMultiProviderMain()
+    response = await cm.chat(messages=messages, model=model)
+
+    return {
+        "response": response,
+        "model": model or "unknown"
+    }
+
+
+@app.get("/openai/models")
+@limiter.limit("30/minute")
+async def openai_models_endpoint(request: Request):
+    """List available models from all configured providers"""
+    config = ProvidersConfigManager()
+    providers = config.get_enabled_providers()
+
+    models = []
+    for provider in providers:
+        for model_name in provider.models:
+            models.append({
+                "id": model_name,
+                "object": "model",
+                "created": 0,
+                "owned_by": provider.name,
+                "permission": [],
+                "root": model_name,
+                "parent": None,
+                "provider": provider.name,
+                "provider_type": provider.type
+            })
+
+    return {
+        "object": "list",
+        "data": models
+    }
+
+
+@app.get("/openai/providers")
+@limiter.limit("30/minute")
+async def openai_providers_endpoint(request: Request):
+    """List all configured providers and their models"""
+    config = ProvidersConfigManager()
+    providers = config.get_enabled_providers()
+
+    providers_data = []
+    for provider in providers:
+        providers_data.append({
+            "name": provider.name,
+            "type": provider.type,
+            "enabled": provider.enabled,
+            "models": provider.models
+        })
+
+    return {
+        "providers": providers_data,
+        "total": len(providers_data)
+    }
+
+
+@app.post("/openai/test-model")
+@limiter.limit("10/minute")
+async def openai_test_model(request: Request, payload: dict):
+    """Test if a model is available in any provider"""
+    model_name = payload.get("model")
+
+    if not model_name:
+        raise HTTPException(status_code=400, detail="Missing 'model' field")
+
+    from helpers.multi_provider_fallback import MultiProviderFallback
+    config = ProvidersConfigManager()
+    fallback = MultiProviderFallback(config)
+
+    results = []
+    for provider in config.get_enabled_providers():
+        is_available = await fallback.test_model_availability(provider, model_name)
+        results.append({
+            "provider": provider.name,
+            "model": model_name,
+            "available": is_available
+        })
+
+    any_available = any(r["available"] for r in results)
+
+    return {
+        "model": model_name,
+        "available": any_available,
+        "providers": results
+    }

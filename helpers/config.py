@@ -92,18 +92,23 @@ class Config:
                 entry['requires_subscription'] = None
                 entry['access_check_error'] = str(e)
 
-    def get_models(self, refresh: bool = False, verify_access: bool | None = None):
+    def get_models(self, refresh: bool = False, verify_access: bool | None = None, free_only: bool = False):
         """Return available models. Use cache unless refresh=True or cache expired.
 
         This is a synchronous helper that prefers a cached JSON file and falls back
         to doing an HTTP request to the Ollama host. The result is stored in
         `self.available_models` and cached on disk.
+
+        Args:
+            refresh: Force refresh from API instead of using cache
+            verify_access: Check if models require subscription (may be slow)
+            free_only: Return only models with requires_subscription == False
         """
         if not refresh:
             cached = self._read_cache()
             if cached is not None:
                 self.available_models = cached
-                return cached
+                return self._filter_free_models(cached) if free_only else cached
 
         # perform synchronous HTTP request to Ollama API
         # Prefer explicit OLLAMA_HOST env var, then client.host, then default.
@@ -117,8 +122,10 @@ class Config:
         url_models = f"{str(host).rstrip('/')}/api/models"
         url_tags = f"{str(host).rstrip('/')}/api/tags"
 
-        # Determine whether to verify model accessibility (env or explicit arg)
-        if verify_access is None:
+        # Always verify access if free_only is requested
+        if free_only:
+            verify_access = True
+        elif verify_access is None:
             verify_access = str(os.getenv("MODEL_VERIFY_ACCESS", "false")).lower() in ("1", "true", "yes")
 
         # Try the canonical /api/models endpoint first, then fallback to /api/tags
@@ -127,9 +134,12 @@ class Config:
             resp = requests.get(url_models, headers=headers, timeout=10)
             resp.raise_for_status()
             models = resp.json()
-            # optionally verify access for each model before caching
+            # verify access for each model before caching
             if verify_access and isinstance(models, dict) and isinstance(models.get('models'), list):
                 self._annotate_model_access(models['models'], url_models, headers)
+            # Filter to free models if requested
+            if free_only:
+                models = self._filter_free_models(models)
             self.available_models = models
             self._write_cache(models)
             return models
@@ -145,9 +155,12 @@ class Config:
             resp = requests.get(url_tags, headers=headers, timeout=10)
             resp.raise_for_status()
             tags = resp.json()
-            # optionally verify access for each tag-derived model before caching
+            # verify access for each tag-derived model before caching
             if verify_access and isinstance(tags, dict) and isinstance(tags.get('models'), list):
                 self._annotate_model_access(tags['models'], url_tags, headers)
+            # Filter to free models if requested - IMPORTANT: save only free models to cache
+            if free_only:
+                tags = self._filter_free_models(tags)
             self.available_models = tags
             self._write_cache(tags)
             return tags
@@ -159,9 +172,26 @@ class Config:
                     data = json.loads(self._models_cache_file.read_text())
                     models = data.get("models")
                     self.available_models = models
-                    return models
+                    return self._filter_free_models(models) if free_only else models
             except Exception:
                 logger.exception("Failed to read models cache file %s", self._models_cache_file)
 
             # final fallback: return in-memory value or empty list
-            return self.available_models if self.available_models is not None else []
+            result = self.available_models if self.available_models is not None else []
+            return self._filter_free_models(result) if free_only else result
+
+    def _filter_free_models(self, models_data):
+        """Filter models list to only include models with requires_subscription == False"""
+        if not isinstance(models_data, dict):
+            return models_data
+
+        models_list = models_data.get('models')
+        if not isinstance(models_list, list):
+            return models_data
+
+        # Filter to only free models
+        free_models = [m for m in models_list
+                      if isinstance(m, dict) and m.get('requires_subscription') == False]
+
+        # Return filtered copy
+        return {**models_data, 'models': free_models}
