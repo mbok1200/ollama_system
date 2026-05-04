@@ -1,0 +1,32 @@
+[
+  {
+    "run_at": "2026-05-04T21:33:59.600670",
+    "logs": [
+      "browser opened",
+      "page opened: https://www.linkedin.com/",
+      "linkedin logged in",
+      "found notifications",
+      "post opened",
+      "Failed to generate reply: 'str' object has no attribute 'get'",
+      "Missing session or reply",
+      "browser closed"
+    ],
+    "notifications": [],
+    "replies": null
+  },
+  {
+    "run_at": "2026-05-04T21:34:20.926327",
+    "logs": [
+      "browser opened",
+      "page opened: https://www.linkedin.com/",
+      "linkedin logged in",
+      "found notifications",
+      "post opened",
+      "Failed to generate reply: 503: All providers failed. Errors: openai_together: Connection error.; ollama: this model requires a subscription, upgrade for access: https://ollama.com/upgrade (ref: fbfaa820-11f8-4d2e-b96e-419b4ea245c1) (status code: 403)",
+      "Missing session or reply",
+      "browser closed"
+    ],
+    "notifications": [],
+    "replies": null
+  }
+]

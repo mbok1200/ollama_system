@@ -1,4 +1,7 @@
 .env
+
 .venv
 *.pyc
 __pycache__/
+user_data/*
+browser_profiles/

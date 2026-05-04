@@ -5,4 +5,7 @@ python-dotenv
 fastapi
 uvicorn[standard]
 gunicorn
-slowapi
+langgraph
+pytest-playwright 
+playwright
+openai
